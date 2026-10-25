@@ -54,6 +54,7 @@ The Word export is built for the coloured, multi-font, variable-size output.
 - Neighbouring letters with identical formatting are merged into one run, to keep the file small.
 - In grid mode, letter spacing is padded so every letter sits in its cell.
 - Rows use exact line spacing, so the layout matches the PNG. Word may clip the tops of the biggest letters in `--variable-size` portraits. `--docx-lines atleast` never clips, but rows grow and the portrait stretches taller. LibreOffice shows exact spacing unclipped.
+- Spelling and grammar squiggles are switched off inside the file (`noProof` on every run, plus the hide-errors document settings). If Word for Mac still shows blue squiggles, see the note below.
 - Rows never wrap (negative right indent), even if Word's letter widths differ from Pillow's.
 - The page is sized to fit the portrait. With `--dark` the page background is black.
 - Fonts are **not embedded**. The reader needs the fonts installed, or Word substitutes them. A variable font shows under its family name (for example `Inter`).
@@ -63,6 +64,19 @@ Ways to ask for it:
 1. `--docx` writes `<out>.docx` beside the `.txt` and `.png`.
 2. `--out name.docx` does the same, with the base name `name`.
 3. Give a `.docx` as the image argument. If that file exists, its largest embedded picture is the source. If it does not exist, a sibling image with the same name (`donne.jpg`, `.png`, ...) is used.
+
+#### Word for Mac: turn off blue grammar squiggles
+
+If Word still underlines letters with blue squiggles (grammar and contextual errors), turn the check off once in Word:
+
+1. Click **Word** in the top menu bar.
+2. Choose **Preferences...**
+3. Click **Spelling & Grammar** (under Authoring and Proofing Tools).
+4. Uncheck **Check grammar as you type**.
+
+#### Black-page version
+
+Add `--dark`: light letters on a black page, and the background removed to black. The demo builds both versions.
 
 ### Options
 
@@ -93,7 +107,7 @@ Run `python3 text_portrait.py --help` for defaults.
 bash demo/build_demo.sh
 ```
 
-The photo is the public-domain `astronaut` sample from scikit-image (her official NASA portrait). The script downloads it, the two Google Fonts and the rembg model on first run. The outputs are committed: [`demo/eileen_collins_portrait.docx`](demo/eileen_collins_portrait.docx), `.png` and `.txt`.
+The photo is the public-domain `astronaut` sample from scikit-image (her official NASA portrait). The script downloads it, the two Google Fonts and the rembg model on first run. It builds a white-page and a black-page (`--dark`) version. The outputs are committed: [`demo/eileen_collins_portrait.docx`](demo/eileen_collins_portrait.docx) and [`demo/eileen_collins_portrait_dark.docx`](demo/eileen_collins_portrait_dark.docx), with `.png` and `.txt` beside each.
 
 ## Notes
 

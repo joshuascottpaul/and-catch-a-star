@@ -82,11 +82,11 @@ and sets `width`, `pitch` (row height) and `ss` (supersample factor). Sizes are 
 |------|---------|
 | `[Content_Types].xml`, `_rels/.rels`, `word/_rels/document.xml.rels` | Package plumbing |
 | `word/document.xml` | One `w:p` per row, line height = row pitch (`exact` or `atLeast`), negative right indent so a row never wraps. One `w:r` per run of identically formatted letters. |
-| `word/settings.xml` | `displayBackgroundShape`, so the black `--dark` page background shows |
+| `word/settings.xml` | `displayBackgroundShape` (so the black `--dark` page shows), `hideSpellingErrors`, `hideGrammaticalErrors`, and `compatibilityMode` 15 (no "Compatibility Mode" banner) |
 
-Run properties: `rFonts` (family from the font file's name table), `b` (when ink >= 0.7 and `--bold` is on), `color` (from the photo), `spacing` (grid cell padding or tracking), `sz`.
+Run properties: `rFonts`, `noProof` (no proofing squiggles) (family from the font file's name table), `b` (when ink >= 0.7 and `--bold` is on), `color` (from the photo), `spacing` (grid cell padding or tracking), `sz`.
 
-Unit mapping: 1 px = 0.75 pt. The page is sized to the portrait, plus 4% slack because Word's metrics differ from Pillow's. If the portrait would exceed Word's page limit (22 in), all sizes are scaled down together.
+Unit mapping: 1 px = 0.75 pt. The page is sized to the portrait, plus 4% width slack and about 4% height slack, because Word's metrics differ from Pillow's and Word rows ran a little taller (the last row spilled to a second page before the height slack). If the portrait would exceed Word's page limit (22 in), all sizes are scaled down together.
 
 Design decisions:
 

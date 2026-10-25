@@ -392,7 +392,7 @@ def make_png_flow(img, cols, text, fonts, args, ss=2, rec=None):
 
 W_NS = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
 PT_PER_PX = 0.75           # 96 dpi
-MAX_PAGE_TWIPS = 29500     # Word page limit is 31680 twips (22 in); leave room for row growth
+MAX_PAGE_TWIPS = 28000     # Word page limit is 31680 twips (22 in); leave room for row growth
 
 
 def family_names(specs):
@@ -409,6 +409,7 @@ def family_names(specs):
 
 def _run(c, fam, half_pt, fill, bold, spacing):
     rpr = (f'<w:rFonts w:ascii="{fam}" w:hAnsi="{fam}" w:cs="{fam}"/>' + ("<w:b/>" if bold else "")
+           + '<w:noProof/>'                      # no spelling/grammar squiggles on the letters
            + f'<w:color w:val="{fill}"/>'
            + (f'<w:spacing w:val="{spacing}"/>' if spacing else "")
            + f'<w:sz w:val="{half_pt}"/><w:szCs w:val="{half_pt}"/>')
@@ -445,7 +446,7 @@ def write_docx(path, rec, fonts, args):
         scale *= MAX_PAGE_TWIPS / total_tw
         px_pt, line_tw, total_tw = layout_total(scale)
     page_w = int(width_tw * scale) + 2 * margin
-    page_h = min(31680, max(1440, total_tw + 2 * margin + 400))
+    page_h = min(31680, max(1440, int(total_tw * 1.04) + 2 * margin + 1200))  # slack: Word rows run a little taller
     paras = []
     for row in rows:
         runs, last, buf = [], None, ""
@@ -472,7 +473,11 @@ def write_docx(path, rec, fonts, args):
                 f'<w:pgMar w:top="{margin}" w:right="{margin}" w:bottom="{margin}" w:left="{margin}" '
                 'w:header="0" w:footer="0" w:gutter="0"/></w:sectPr></w:body></w:document>')
     settings = ('<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
-                f'<w:settings xmlns:w="{W_NS}"><w:displayBackgroundShape/></w:settings>')
+                f'<w:settings xmlns:w="{W_NS}"><w:displayBackgroundShape/>'
+                '<w:hideSpellingErrors/><w:hideGrammaticalErrors/>'
+                '<w:compat><w:compatSetting w:name="compatibilityMode" '
+                'w:uri="http://schemas.microsoft.com/office/word" w:val="15"/></w:compat>'
+                '</w:settings>')
     content_types = ('<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
         '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'
         '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>'
