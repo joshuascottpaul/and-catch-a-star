@@ -24,7 +24,7 @@ Everything on:
       --variable-size --fonts "Inter.ttf,PlayfairDisplay.ttf" --font-mix word
 
 Requires:  pip install pillow numpy
-Optional:  pip install opencv-python-headless   (--face-crop)
+Optional:  pip install "opencv-python-headless<5" (--face-crop; OpenCV 5 dropped the detector)
            pip install rembg onnxruntime          (--remove-bg, downloads a model on first use)
 """
 import argparse
@@ -84,7 +84,10 @@ def face_crop(img, pad):
     try:
         import cv2
     except ImportError:
-        raise SystemExit("--face-crop needs:  pip install opencv-python-headless")
+        raise SystemExit('--face-crop needs:  pip install "opencv-python-headless<5"')
+    if not hasattr(cv2, "CascadeClassifier"):
+        raise SystemExit(f"OpenCV {cv2.__version__} has no CascadeClassifier (removed in 5.x). "
+                         'Install:  pip install "opencv-python-headless<5"')
     gray = np.asarray(ImageOps.grayscale(img))
     m = min(gray.shape)
     faces = []
@@ -389,7 +392,7 @@ def make_png_flow(img, cols, text, fonts, args, ss=2, rec=None):
 
 W_NS = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
 PT_PER_PX = 0.75           # 96 dpi
-MAX_PAGE_TWIPS = 31000     # Word's page limit is 31680 twips (22 in)
+MAX_PAGE_TWIPS = 29500     # Word page limit is 31680 twips (22 in); leave room for row growth
 
 
 def family_names(specs):
@@ -417,15 +420,32 @@ def write_docx(path, rec, fonts, args):
     One paragraph per row, one run per letter (equal neighbours merged). Each run carries
     its colour, font family, size and bold. Fonts must be installed where the file is opened."""
     ss, rows = rec["ss"], rec["rows"]
+    print("Word file needs these fonts installed: " + ", ".join(family_names(fonts.specs)))
     fams = [escape(f, {'"': "&quot;"}) for f in family_names(fonts.specs)]
     width_tw = rec["width"] / ss * PT_PER_PX * 20 * 1.04        # 4% slack: Word's metrics differ
     scale = min(1.0, MAX_PAGE_TWIPS / width_tw)
-    px_pt = PT_PER_PX * scale / ss                               # recorded px -> points
     margin = 360
+
+    def layout(scale):
+        px_pt = PT_PER_PX * scale / ss                           # recorded px -> points
+        line_tw = max(20, int(rec["pitch"] * px_pt * 20))
+        # "atLeast" lets a row grow to fit its tallest letter: size the page from real row heights
+        total = sum(max(line_tw, int(max(max(2, round(c[2] * px_pt * 2)) for c in row) * 10 * 1.4))
+                    for row in rows if row)
+        return px_pt, line_tw, total
+
+    exact = args.docx_lines == "exact"
+    rule = "exact" if exact else "atLeast"
+    if exact:        # rows keep the PNG pitch (overlap allowed); Word may clip tops of big letters
+        layout_total = lambda sc: layout(sc)[:2] + (int(len(rows) * rec["pitch"] * PT_PER_PX * sc / ss * 20),)
+    else:
+        layout_total = layout
+    px_pt, line_tw, total_tw = layout_total(scale)
+    if total_tw > MAX_PAGE_TWIPS:                                # also fit Word's height limit
+        scale *= MAX_PAGE_TWIPS / total_tw
+        px_pt, line_tw, total_tw = layout_total(scale)
     page_w = int(width_tw * scale) + 2 * margin
-    page_h = max(1440, int(len(rows) * rec["pitch"] * px_pt * 20) + 2 * margin + 400)
-    page_h = min(page_h, 31680)
-    line_tw = max(20, int(rec["pitch"] * px_pt * 20))
+    page_h = min(31680, max(1440, total_tw + 2 * margin + 400))
     paras = []
     for row in rows:
         runs, last, buf = [], None, ""
@@ -442,7 +462,8 @@ def write_docx(path, rec, fonts, args):
         if last:
             runs.append(_run(buf, *last))
         paras.append('<w:p><w:pPr><w:spacing w:before="0" w:after="0" w:line="%d" '
-                     'w:lineRule="exact"/></w:pPr>%s</w:p>' % (line_tw, "".join(runs)))
+                     'w:lineRule="%s"/><w:ind w:right="-%d"/></w:pPr>%s</w:p>'    # negative right indent: a row never wraps
+                     % (line_tw, rule, page_w, "".join(runs)))
     bg = "000000" if args.dark else "FFFFFF"
     document = ('<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
                 f'<w:document xmlns:w="{W_NS}"><w:background w:color="{bg}"/><w:body>'
@@ -488,6 +509,9 @@ def main():
                    help="also write <out>.docx: live Word text, per-letter colour/font/size (implies --color). "
                         "Automatic when the input image is a .docx")
     g.add_argument("--width", type=int, default=120, help="TXT columns (default 120)")
+    g.add_argument("--docx-lines", choices=["exact", "atleast"], default="exact",
+                   help="docx line spacing. exact: true to the PNG (default); Word may clip the tops of "
+                        "big letters. atleast: never clips, but rows grow so the portrait stretches taller")
     g.add_argument("--png-width", type=int, default=None, help="PNG columns (default 1.5x --width)")
     g = ap.add_argument_group("image prep")
     g.add_argument("--face-crop", action="store_true", help="auto-crop to the face (needs opencv)")

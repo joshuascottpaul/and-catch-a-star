@@ -91,6 +91,16 @@ class DocxExport(unittest.TestCase):
         self.assertNotEqual(r.returncode, 0)
         self.assertIn("Source image not found", r.stderr)
 
+    def test_rows_never_wrap_and_line_rule_option(self):
+        for mode, rule in (("exact", "exact"), ("atleast", "atLeast")):
+            r = run(self.d, "pic.png", "poem.txt", "--docx", "--width", "30",
+                    "--docx-lines", mode, "--out", "m_" + mode)
+            self.assertEqual(r.returncode, 0, r.stderr)
+            with zipfile.ZipFile(self.d / ("m_" + mode + ".docx")) as z:
+                doc = z.read("word/document.xml").decode()
+            self.assertIn('w:lineRule="%s"' % rule, doc)
+            self.assertIn('<w:ind w:right="-', doc)
+
     def test_default_run_writes_no_docx(self):
         r = run(self.d, "pic.png", "poem.txt", "--width", "30")
         self.assertEqual(r.returncode, 0, r.stderr)

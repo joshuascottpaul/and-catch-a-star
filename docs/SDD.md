@@ -81,7 +81,7 @@ and sets `width`, `pitch` (row height) and `ss` (supersample factor). Sizes are 
 | Part | Content |
 |------|---------|
 | `[Content_Types].xml`, `_rels/.rels`, `word/_rels/document.xml.rels` | Package plumbing |
-| `word/document.xml` | One `w:p` per row, exact line height = row pitch. One `w:r` per run of identically formatted letters. |
+| `word/document.xml` | One `w:p` per row, line height = row pitch (`exact` or `atLeast`), negative right indent so a row never wraps. One `w:r` per run of identically formatted letters. |
 | `word/settings.xml` | `displayBackgroundShape`, so the black `--dark` page background shows |
 
 Run properties: `rFonts` (family from the font file's name table), `b` (when ink >= 0.7 and `--bold` is on), `color` (from the photo), `spacing` (grid cell padding or tracking), `sz`.
@@ -119,5 +119,6 @@ Face crop and background removal are checked by hand, because they need heavy op
 ## 8. Known limits and next steps
 
 1. Fonts are not embedded in the DOCX. A reader without the fonts sees substitutes.
-2. Word clips the tops of very large letters when the line height is exact. LibreOffice renders them correctly. Next step: test in Word, and if clipped, switch to `atLeast` line spacing.
+2. Exact line spacing (default) keeps the PNG proportions but Word may clip the tops of big letters. LibreOffice does not clip. `--docx-lines atleast` never clips but stretches the portrait taller (rows cannot overlap). Next step: open a variable-size sample in Word; if the clipping is bad, consider per-run `position` offsets instead of overlap.
 3. Face detection is weak on engravings.
+4. `--face-crop` needs OpenCV below 5: version 5 removed `CascadeClassifier`. The script exits with the install command if it finds 5.x.
