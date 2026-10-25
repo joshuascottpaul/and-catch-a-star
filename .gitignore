@@ -1,0 +1,9 @@
+__pycache__/
+*.pyc
+.venv/
+*_portrait.txt
+*_portrait.png
+*_portrait.docx
+.DS_Store
+2026 10 24 *
+Document.md
