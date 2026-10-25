@@ -116,7 +116,11 @@ Missing optional dependency, missing font, empty text and a missing source image
 
 Face crop and background removal are checked by hand, because they need heavy optional models.
 
-## 8. Known limits and next steps
+## 8. Demo
+
+`demo/build_demo.sh` is the reproducible demo build. It downloads the photo (scikit-image `astronaut`, public domain) and two OFL fonts into git-ignored `demo/assets/`, then runs the full command with a `.docx` image argument that resolves through the sibling-image fallback. Committed inputs: `demo/poem.txt`. Committed outputs: `demo/eileen_collins_portrait.*`.
+
+## 9. Known limits and next steps
 
 1. Fonts are not embedded in the DOCX. A reader without the fonts sees substitutes.
 2. Exact line spacing (default) keeps the PNG proportions but Word may clip the tops of big letters. LibreOffice does not clip. `--docx-lines atleast` never clips but stretches the portrait taller (rows cannot overlap). Next step: open a variable-size sample in Word; if the clipping is bad, consider per-run `position` offsets instead of overlap.
