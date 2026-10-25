@@ -56,7 +56,7 @@ The Word export is built for the coloured, multi-font, variable-size output.
 - Rows use exact line spacing, so the layout matches the PNG. Word may clip the tops of the biggest letters in `--variable-size` portraits. `--docx-lines atleast` never clips, but rows grow and the portrait stretches taller. LibreOffice shows exact spacing unclipped.
 - Spelling and grammar squiggles are switched off inside the file (`noProof` on every run, plus the hide-errors document settings). If Word for Mac still shows blue squiggles, see the note below.
 - Rows never wrap (negative right indent), even if Word's letter widths differ from Pillow's.
-- The page is sized to fit the portrait. With `--dark` the page background is black.
+- The page is sized to fit the portrait, with 0.75 inch margins on all four sides. With `--dark` the page background is black.
 - Fonts are **not embedded**. The reader needs the fonts installed, or Word substitutes them. A variable font shows under its family name (for example `Inter`).
 
 Ways to ask for it:
