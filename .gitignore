@@ -7,3 +7,5 @@ __pycache__/
 .DS_Store
 2026 10 24 *
 Document.md
+demo/assets/
+!demo/eileen_collins_portrait.*

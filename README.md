@@ -85,6 +85,16 @@ Ways to ask for it:
 
 Run `python3 text_portrait.py --help` for defaults.
 
+## Demo
+
+`demo/build_demo.sh` builds the sample in `demo/`: Eileen Collins, the NASA astronaut (first woman to pilot a Space Shuttle, STS-63, 1995, and the first to command one, STS-93, 1999), rendered in lines of John Donne, with face crop, background removal, variable size and Inter + Playfair Display mixed per word.
+
+```
+bash demo/build_demo.sh
+```
+
+The photo is the public-domain `astronaut` sample from scikit-image (her official NASA portrait). The script downloads it, the two Google Fonts and the rembg model on first run. The outputs are committed: [`demo/eileen_collins_portrait.docx`](demo/eileen_collins_portrait.docx), `.png` and `.txt`.
+
 ## Notes
 
 - The face detector is trained on photos. It may miss an engraving. Crop by hand and skip `--face-crop` if it does.
