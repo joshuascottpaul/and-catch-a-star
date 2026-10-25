@@ -101,7 +101,7 @@ Run `python3 text_portrait.py --help` for defaults.
 
 ## Demo
 
-`demo/build_demo.sh` builds the sample in `demo/`: Eileen Collins, the NASA astronaut (first woman to pilot a Space Shuttle, STS-63, 1995, and the first to command one, STS-93, 1999), rendered in lines of John Donne, with face crop, background removal, variable size and Inter + Playfair Display mixed per word.
+`demo/build_demo.sh` builds the sample in `demo/`: Eileen Collins, the NASA astronaut (first woman to pilot a Space Shuttle, STS-63, 1995, and the first to command one, STS-93, 1999), rendered in the words of John Donne's "Go and Catch a Falling Star" (the poem this repo is named for), with face crop, background removal, variable size and Inter + Playfair Display mixed per word.
 
 ```
 bash demo/build_demo.sh
