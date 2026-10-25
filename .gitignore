@@ -9,3 +9,4 @@ __pycache__/
 Document.md
 demo/assets/
 !demo/eileen_collins_portrait.*
+demo/*.pdf
