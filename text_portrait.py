@@ -9,9 +9,15 @@ Outputs:
   <out>.txt  plain ASCII art. Blank = light, lowercase = mid, UPPERCASE = dark.
   <out>.png  typographic portrait: every letter inked (and optionally sized,
              weighted and font-picked) by the image underneath. Best likeness.
+  <out>.docx Word export of the PNG layout (--docx): live, editable text where
+             every letter keeps its own colour, size and font. Always coloured.
 
 Basic:
   python3 text_portrait.py donne.jpg poem.txt
+
+Word export (input may also be a .docx; its largest embedded picture is used):
+  python3 text_portrait.py donne.docx poem.txt --face-crop --remove-bg \
+      --variable-size --fonts "Inter.ttf,PlayfairDisplay.ttf" --font-mix word
 
 Everything on:
   python3 text_portrait.py donne.jpg poem.txt --face-crop --remove-bg \
@@ -25,7 +31,10 @@ import argparse
 import random
 import re
 import unicodedata
+import zipfile
+from io import BytesIO
 from pathlib import Path
+from xml.sax.saxutils import escape
 
 import numpy as np
 from PIL import Image, ImageDraw, ImageEnhance, ImageFilter, ImageFont, ImageOps
@@ -108,8 +117,36 @@ def remove_bg(img, model, bg_color):
     return Image.alpha_composite(base, cut).convert("RGB")
 
 
+IMAGE_EXTS = (".jpg", ".jpeg", ".png", ".webp", ".tif", ".tiff", ".bmp")
+
+
+def open_source_image(path):
+    """Open an image file. A .docx is accepted too: its largest embedded picture is used.
+    If the .docx does not exist, a sibling image with the same name stem is used instead."""
+    p = Path(path)
+    if p.suffix.lower() != ".docx":
+        return Image.open(p)
+    if p.exists():
+        with zipfile.ZipFile(p) as z:
+            media = [i for i in z.infolist()
+                     if i.filename.startswith("word/media/")
+                     and i.filename.lower().endswith(IMAGE_EXTS)]
+            if not media:
+                raise SystemExit(f"{p} has no embedded picture to use as the source image.")
+            best = max(media, key=lambda i: i.file_size)
+            img = Image.open(BytesIO(z.read(best)))
+            img.load()
+            return img
+    for ext in IMAGE_EXTS:
+        sib = p.with_suffix(ext)
+        if sib.exists():
+            print(f"{p} not found - using {sib} as the source image.")
+            return Image.open(sib)
+    raise SystemExit(f"Source image not found: {p} (looked for a .docx, then {p.stem}.jpg/.png/...)")
+
+
 def load_image(args):
-    img = ImageOps.exif_transpose(Image.open(args.image))
+    img = ImageOps.exif_transpose(open_source_image(args.image))
     if img.mode in ("RGBA", "LA", "P"):
         img = img.convert("RGBA")
         img = Image.alpha_composite(Image.new("RGBA", img.size, (255, 255, 255, 255)), img)
@@ -186,6 +223,7 @@ class FontSet:
         self.cache = {}
         self.rng = random.Random(seed)
         self.word_pick = {}
+        self.last = (0, -1)             # (font index, weight step) of the latest get()
         self.axes = []
         for p, i in specs:
             try:
@@ -221,6 +259,7 @@ class FontSet:
         wi = self._wght(axes) if self.vary_weight else None
         wb = int(round(ink * 8)) if wi is not None else -1     # 9 weight steps
         key = (idx, size, wb)
+        self.last = (idx, wb)
         if key not in self.cache:
             p, i = self.specs[idx]
             f = ImageFont.truetype(p, size, index=i)
@@ -273,7 +312,7 @@ def stroke_for(ink, args, fonts, ss):
     return int(round(ink ** 1.5 * b * ss))
 
 
-def make_png_grid(img, cols, text, fonts, args, ss=2):
+def make_png_grid(img, cols, text, fonts, args, ss=2, rec=None):
     size = args.font_size * ss
     ref = fonts.get(0.5, 0, size)
     cw = max(1, round(np.mean([fonts.get(0.5, w, size).getlength("n") for w in range(len(fonts.specs))])))
@@ -286,16 +325,22 @@ def make_png_grid(img, cols, text, fonts, args, ss=2):
     px = np.asarray(small)
     stream = text_stream(text, args.keep_spaces)
     for y in range(rows):
+        row = []
         for x in range(cols):
             c, word = next(stream)
             ink, fill = ink_and_fill(float(gray[y, x]), px[y, x], args)
             f = fonts.get(ink, word, size)
             draw.text((x * cw + cw / 2, y * ch + asc), c, font=f, fill=fill, anchor="ms",
                       stroke_width=stroke_for(ink, args, fonts, ss), stroke_fill=fill)
+            row.append((c, fonts.last[0], size, fill, ink, cw - f.getlength(c)))  # pad to the cell
+        if rec is not None:
+            rec["rows"].append(row)
+    if rec is not None:
+        rec.update(width=canvas.width, pitch=ch, ss=ss)
     return canvas.resize((canvas.width // ss, canvas.height // ss), Image.LANCZOS)
 
 
-def make_png_flow(img, cols, text, fonts, args, ss=2):
+def make_png_flow(img, cols, text, fonts, args, ss=2, rec=None):
     """Variable size: letters flow along each line like typeset text.
     Each letter's size comes from the darkness under it, so lines stay readable."""
     base = args.font_size * ss
@@ -317,6 +362,7 @@ def make_png_flow(img, cols, text, fonts, args, ss=2):
         baseline = top + round(row_h * 0.78)
         cy = min(H - 1, top + row_h // 2)
         x = 0.0
+        row = []
         while x < W:
             c, word = pending or next(stream)
             pending = None
@@ -331,7 +377,102 @@ def make_png_flow(img, cols, text, fonts, args, ss=2):
             draw.text((x, baseline), c, font=f, fill=fill, anchor="ls",
                       stroke_width=stroke_for(ink, args, fonts, ss), stroke_fill=fill)
             x += adv + args.tracking * ss
+            row.append((c, fonts.last[0], size, fill, ink, args.tracking * ss))
+        if rec is not None:
+            rec["rows"].append(row)
+    if rec is not None:
+        rec.update(width=W, pitch=row_h, ss=ss)
     return canvas.resize((W // ss, H // ss), Image.LANCZOS)
+
+
+# ---------------------------------------------------------------- docx
+
+W_NS = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+PT_PER_PX = 0.75           # 96 dpi
+MAX_PAGE_TWIPS = 31000     # Word's page limit is 31680 twips (22 in)
+
+
+def family_names(specs):
+    """Family name Word should ask for, read from each font file."""
+    names = []
+    for p, i in specs:
+        try:
+            fam = ImageFont.truetype(p, 12, index=i).getname()[0]
+        except Exception:
+            fam = Path(p).stem
+        names.append(fam)
+    return names
+
+
+def _run(c, fam, half_pt, fill, bold, spacing):
+    rpr = (f'<w:rFonts w:ascii="{fam}" w:hAnsi="{fam}" w:cs="{fam}"/>' + ("<w:b/>" if bold else "")
+           + f'<w:color w:val="{fill}"/>'
+           + (f'<w:spacing w:val="{spacing}"/>' if spacing else "")
+           + f'<w:sz w:val="{half_pt}"/><w:szCs w:val="{half_pt}"/>')
+    return f'<w:r><w:rPr>{rpr}</w:rPr><w:t xml:space="preserve">{escape(c)}</w:t></w:r>'
+
+
+def write_docx(path, rec, fonts, args):
+    """Write the recorded portrait layout as a .docx (stdlib zipfile + hand-built OOXML).
+    One paragraph per row, one run per letter (equal neighbours merged). Each run carries
+    its colour, font family, size and bold. Fonts must be installed where the file is opened."""
+    ss, rows = rec["ss"], rec["rows"]
+    fams = [escape(f, {'"': "&quot;"}) for f in family_names(fonts.specs)]
+    width_tw = rec["width"] / ss * PT_PER_PX * 20 * 1.04        # 4% slack: Word's metrics differ
+    scale = min(1.0, MAX_PAGE_TWIPS / width_tw)
+    px_pt = PT_PER_PX * scale / ss                               # recorded px -> points
+    margin = 360
+    page_w = int(width_tw * scale) + 2 * margin
+    page_h = max(1440, int(len(rows) * rec["pitch"] * px_pt * 20) + 2 * margin + 400)
+    page_h = min(page_h, 31680)
+    line_tw = max(20, int(rec["pitch"] * px_pt * 20))
+    paras = []
+    for row in rows:
+        runs, last, buf = [], None, ""
+        for c, idx, size, fill, ink, extra in row:
+            hp = max(2, round(size * px_pt * 2))
+            key = (fams[idx], hp, "%02X%02X%02X" % tuple(fill[:3]),
+                   bool(args.bold and ink >= 0.7), round(extra * px_pt * 20))
+            if key == last:
+                buf += c
+                continue
+            if last:
+                runs.append(_run(buf, *last))
+            last, buf = key, c
+        if last:
+            runs.append(_run(buf, *last))
+        paras.append('<w:p><w:pPr><w:spacing w:before="0" w:after="0" w:line="%d" '
+                     'w:lineRule="exact"/></w:pPr>%s</w:p>' % (line_tw, "".join(runs)))
+    bg = "000000" if args.dark else "FFFFFF"
+    document = ('<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+                f'<w:document xmlns:w="{W_NS}"><w:background w:color="{bg}"/><w:body>'
+                + "".join(paras)
+                + f'<w:sectPr><w:pgSz w:w="{page_w}" w:h="{page_h}"/>'
+                f'<w:pgMar w:top="{margin}" w:right="{margin}" w:bottom="{margin}" w:left="{margin}" '
+                'w:header="0" w:footer="0" w:gutter="0"/></w:sectPr></w:body></w:document>')
+    settings = ('<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+                f'<w:settings xmlns:w="{W_NS}"><w:displayBackgroundShape/></w:settings>')
+    content_types = ('<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+        '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'
+        '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>'
+        '<Default Extension="xml" ContentType="application/xml"/>'
+        '<Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>'
+        '<Override PartName="/word/settings.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.settings+xml"/>'
+        '</Types>')
+    rels = ('<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+        '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+        '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>'
+        '</Relationships>')
+    doc_rels = ('<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+        '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+        '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/settings" Target="settings.xml"/>'
+        '</Relationships>')
+    with zipfile.ZipFile(path, "w", zipfile.ZIP_DEFLATED) as z:
+        z.writestr("[Content_Types].xml", content_types)
+        z.writestr("_rels/.rels", rels)
+        z.writestr("word/document.xml", document)
+        z.writestr("word/settings.xml", settings)
+        z.writestr("word/_rels/document.xml.rels", doc_rels)
 
 
 # ---------------------------------------------------------------- main
@@ -341,7 +482,11 @@ def main():
     ap.add_argument("image")
     ap.add_argument("textfile")
     g = ap.add_argument_group("output")
-    g.add_argument("--out", default=None, help="output base name (default: <image>_portrait)")
+    g.add_argument("--out", default=None,
+                   help="output base name (default: <image>_portrait); a .docx name also turns on --docx")
+    g.add_argument("--docx", action="store_true",
+                   help="also write <out>.docx: live Word text, per-letter colour/font/size (implies --color). "
+                        "Automatic when the input image is a .docx")
     g.add_argument("--width", type=int, default=120, help="TXT columns (default 120)")
     g.add_argument("--png-width", type=int, default=None, help="PNG columns (default 1.5x --width)")
     g = ap.add_argument_group("image prep")
@@ -382,6 +527,14 @@ def main():
     g.add_argument("--dark", action="store_true", help="light letters on black")
     args = ap.parse_args()
 
+    if args.out and args.out.lower().endswith(".docx"):
+        args.out, args.docx = args.out[:-5], True
+    if Path(args.image).suffix.lower() == ".docx":
+        args.docx = True
+    if args.docx and not args.color:
+        args.color = True
+        print("Word export is always coloured: --color is on.")
+
     text = load_text(args.textfile, args.unicode)
     img = load_image(args)
     base = args.out or f"{Path(args.image).stem}_portrait"
@@ -395,10 +548,14 @@ def main():
     fonts = FontSet(resolve_fonts(args.fonts), args.font_mix, not args.no_weight)
     pcols = args.png_width or int(args.width * 1.5)
     maker = make_png_flow if args.variable_size else make_png_grid
-    maker(img, pcols, text, fonts, args).save(base + ".png")
+    rec = {"rows": []} if args.docx else None
+    maker(img, pcols, text, fonts, args, rec=rec).save(base + ".png")
+    if rec is not None:
+        write_docx(base + ".docx", rec, fonts, args)
 
     print(f"Wrote {base}.txt ({gray.shape[1]}x{gray.shape[0]}) and {base}.png "
-          f"({'variable size' if args.variable_size else 'grid'}, {pcols} cols)")
+          f"({'variable size' if args.variable_size else 'grid'}, {pcols} cols)"
+          + (f" and {base}.docx" if rec is not None else ""))
 
 
 if __name__ == "__main__":
