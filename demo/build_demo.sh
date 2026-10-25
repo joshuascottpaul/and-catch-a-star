@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Build the demo: Eileen Collins (NASA astronaut, scikit-image's public-domain "astronaut" photo)
-# rendered in the words of Donne, as .txt, .png and a coloured multi-font .docx.
+# rendered in the words of Donne, as .txt, .png and a coloured multi-font .docx,
+# in a white-page and a black-page version.
 #
 #   bash demo/build_demo.sh
 #
@@ -26,10 +27,16 @@ fetch "https://raw.githubusercontent.com/scikit-image/scikit-image/v0.25.0/skima
 
 cd "$HERE"
 # The .docx argument does not exist: the script falls back to assets/eileen_collins.png beside it.
-"$PYTHON" ../text_portrait.py assets/eileen_collins.docx poem.txt \
-    --face-crop --remove-bg --variable-size \
-    --fonts "assets/Inter.ttf,assets/PlayfairDisplay.ttf" --font-mix word \
+COMMON=(--face-crop --remove-bg --variable-size
+        --fonts "assets/Inter.ttf,assets/PlayfairDisplay.ttf" --font-mix word)
+
+# White page.
+"$PYTHON" ../text_portrait.py assets/eileen_collins.docx poem.txt "${COMMON[@]}" \
     --out eileen_collins_portrait
+# Black page: light letters on black (--dark), background removed to black.
+"$PYTHON" ../text_portrait.py assets/eileen_collins.docx poem.txt "${COMMON[@]}" --dark \
+    --out eileen_collins_portrait_dark
 
 echo
-echo "Done. Open demo/eileen_collins_portrait.docx (install Inter and Playfair Display first)."
+echo "Done. Open demo/eileen_collins_portrait.docx and demo/eileen_collins_portrait_dark.docx"
+echo "(install Inter and Playfair Display first)."

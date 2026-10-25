@@ -101,6 +101,16 @@ class DocxExport(unittest.TestCase):
             self.assertIn('w:lineRule="%s"' % rule, doc)
             self.assertIn('<w:ind w:right="-', doc)
 
+    def test_proofing_and_compat_settings(self):
+        r = run(self.d, "pic.png", "poem.txt", "--docx", "--width", "30", "--dark", "--out", "p")
+        self.assertEqual(r.returncode, 0, r.stderr)
+        with zipfile.ZipFile(self.d / "p.docx") as z:
+            doc, st = z.read("word/document.xml").decode(), z.read("word/settings.xml").decode()
+        self.assertIn("<w:noProof/>", doc)
+        self.assertIn('<w:background w:color="000000"/>', doc)
+        for tag in ("hideSpellingErrors", "hideGrammaticalErrors", 'w:val="15"'):
+            self.assertIn(tag, st)
+
     def test_default_run_writes_no_docx(self):
         r = run(self.d, "pic.png", "poem.txt", "--width", "30")
         self.assertEqual(r.returncode, 0, r.stderr)
