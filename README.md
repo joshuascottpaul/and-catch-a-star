@@ -24,7 +24,7 @@ pip install pillow numpy
 Optional, per feature:
 
 ```
-pip install opencv-python-headless    # --face-crop
+pip install "opencv-python-headless<5"  # --face-crop (OpenCV 5 removed the face detector)
 pip install rembg onnxruntime         # --remove-bg (downloads a ~176 MB model on first use)
 ```
 
@@ -53,6 +53,8 @@ The Word export is built for the coloured, multi-font, variable-size output.
 - Each row is one paragraph. Each letter is a run with its own font family, size, colour and bold.
 - Neighbouring letters with identical formatting are merged into one run, to keep the file small.
 - In grid mode, letter spacing is padded so every letter sits in its cell.
+- Rows use exact line spacing, so the layout matches the PNG. Word may clip the tops of the biggest letters in `--variable-size` portraits. `--docx-lines atleast` never clips, but rows grow and the portrait stretches taller. LibreOffice shows exact spacing unclipped.
+- Rows never wrap (negative right indent), even if Word's letter widths differ from Pillow's.
 - The page is sized to fit the portrait. With `--dark` the page background is black.
 - Fonts are **not embedded**. The reader needs the fonts installed, or Word substitutes them. A variable font shows under its family name (for example `Inter`).
 
@@ -67,7 +69,7 @@ Ways to ask for it:
 | Group | Option | Meaning |
 |-------|--------|---------|
 | output | `--out` | Output base name. Default `<image>_portrait`. |
-| output | `--docx` | Also write a Word file. |
+| output | `--docx`, `--docx-lines` | Also write a Word file. Line spacing `exact` (default) or `atleast`. |
 | output | `--width` | TXT columns. Default 120. |
 | output | `--png-width` | PNG columns. Default 1.5 x `--width`. |
 | image | `--face-crop`, `--crop-pad` | Crop to the face. Pad 0.5 tight to 2 loose. |
