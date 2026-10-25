@@ -425,7 +425,7 @@ def write_docx(path, rec, fonts, args):
     fams = [escape(f, {'"': "&quot;"}) for f in family_names(fonts.specs)]
     width_tw = rec["width"] / ss * PT_PER_PX * 20 * 1.04        # 4% slack: Word's metrics differ
     scale = min(1.0, MAX_PAGE_TWIPS / width_tw)
-    margin = 360
+    margin = 1080                       # 0.75 in on every side
 
     def layout(scale):
         px_pt = PT_PER_PX * scale / ss                           # recorded px -> points
