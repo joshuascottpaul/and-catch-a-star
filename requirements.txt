@@ -1,0 +1,6 @@
+pillow
+numpy
+# optional, per feature:
+# opencv-python-headless   (--face-crop)
+# rembg
+# onnxruntime              (--remove-bg)
